@@ -1163,28 +1163,50 @@ def get_db():
 
 # --- DATABASE INTEGRATION FUNCTIONS ---
 def create_user_session(criteria, admin_id):
-    """Create a new user session in database"""
+    """Create or update a user session in database"""
     try:
         with get_db() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO icp.v_UserSession 
-                (CaseID, Email, Mobile, Make, Model, BodyType, Trim, PriceMin, PriceMax, 
-                 YearMin, YearMax, ChassisNumber, OdometerReading, AdminID, GoogleImageCheck, InsuranceLookup)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                criteria.get('case_id'), criteria.get('user_email'), criteria.get('user_mobile'),
-                criteria.get('make'), criteria.get('model_value'), criteria.get('body_type'),
-                criteria.get('trim'), criteria.get('price_min'), criteria.get('price_max'), 
-                criteria.get('year_min'), criteria.get('year_max'), criteria.get('chasis_no'),
-                criteria.get('odometer_reading'), admin_id,
-                criteria.get('google_image_check', False), criteria.get('insurance_lookup', False)
-            ))
-            conn.commit()
             
-            # Get the created SessionID
+            # Check if this CaseID already exists (treating unsubmitted ones as DRAFT)
             cursor.execute("SELECT SessionID FROM icp.v_UserSession WHERE CaseID = ?", (criteria.get('case_id'),))
-            session_id = cursor.fetchone()[0]
+            existing = cursor.fetchone()
+            
+            if existing:
+                session_id = existing[0]
+                # Update the existing session rather than crashing
+                cursor.execute("""
+                    UPDATE icp.v_UserSession 
+                    SET Email=?, Mobile=?, Make=?, Model=?, BodyType=?, Trim=?, PriceMin=?, PriceMax=?, 
+                        YearMin=?, YearMax=?, ChassisNumber=?, OdometerReading=?, AdminID=?, GoogleImageCheck=?, InsuranceLookup=?
+                    WHERE SessionID=?
+                """, (
+                    criteria.get('user_email'), criteria.get('user_mobile'),
+                    criteria.get('make'), criteria.get('model_value'), criteria.get('body_type'),
+                    criteria.get('trim'), criteria.get('price_min'), criteria.get('price_max'), 
+                    criteria.get('year_min'), criteria.get('year_max'), criteria.get('chasis_no'),
+                    criteria.get('odometer_reading'), admin_id,
+                    criteria.get('google_image_check', False), criteria.get('insurance_lookup', False),
+                    session_id
+                ))
+            else:
+                cursor.execute("""
+                    INSERT INTO icp.v_UserSession 
+                    (CaseID, Email, Mobile, Make, Model, BodyType, Trim, PriceMin, PriceMax, 
+                     YearMin, YearMax, ChassisNumber, OdometerReading, AdminID, GoogleImageCheck, InsuranceLookup)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    criteria.get('case_id'), criteria.get('user_email'), criteria.get('user_mobile'),
+                    criteria.get('make'), criteria.get('model_value'), criteria.get('body_type'),
+                    criteria.get('trim'), criteria.get('price_min'), criteria.get('price_max'), 
+                    criteria.get('year_min'), criteria.get('year_max'), criteria.get('chasis_no'),
+                    criteria.get('odometer_reading'), admin_id,
+                    criteria.get('google_image_check', False), criteria.get('insurance_lookup', False)
+                ))
+                cursor.execute("SELECT SessionID FROM icp.v_UserSession WHERE CaseID = ?", (criteria.get('case_id'),))
+                session_id = cursor.fetchone()[0]
+
+            conn.commit()
             return session_id
     except Exception as e:
         logging.error(f"Error creating user session: {e}")
