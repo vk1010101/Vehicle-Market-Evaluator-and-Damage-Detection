@@ -1,0 +1,21 @@
+# Email Configuration (Gmail SMTP)
+SENDER_EMAIL=your_email@gmail.com
+SENDER_PASSWORD=your_app_password
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+
+# Database Configuration (SQL Server)
+DB_SERVER=your_server_ip
+DB_NAME=your_db_name
+DB_USER=your_username
+DB_PASSWORD=your_password
+DB_DRIVER={ODBC Driver 18 for SQL Server}
+
+HF_API_KEY=your_hugging_face_token_here
+
+# PDF Generation
+WKHTMLTOPDF=C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe
+
+# Copy this file to .env and modify values as needed
+# The application will use hardcoded defaults if .env is not present

@@ -1,0 +1,54 @@
+# Core Application
+flask
+flask-session
+Werkzeug
+Jinja2
+itsdangerous
+click
+blinker
+python-dotenv
+gunicorn
+
+# Database & Data
+pyodbc
+pandas
+numpy
+openpyxl
+et-xmlfile
+python-dateutil
+tzdata
+
+# Scrapers & Networking
+requests
+urllib3
+certifi
+charset-normalizer
+idna
+cloudscraper
+beautifulsoup4
+
+# Browser Automation (Pin Chrome v146 Compatibility)
+selenium
+undetected-chromedriver
+
+# Image & AI Services
+gradio_client
+Pillow
+
+# PDF Generation (Note: Requires wkhtmltopdf installed on system)
+pdfkit
+
+# Optional Runtime Deps for uc
+trio
+trio-websocket
+wsproto
+sniffio
+outcome
+attrs
+sortedcontainers
+h11
+websockets
+
+# system notes: 
+# 1. ODBC Driver 18 for SQL Server must be installed on top of the OS.
+# 2. wkhtmltopdf must be in the system PATH for PDF generation to work.

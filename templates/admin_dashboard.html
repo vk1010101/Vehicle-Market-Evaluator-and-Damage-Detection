@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <h1 class="welcome-title">Welcome, {{ session.get('username', 'admin') }}!</h1>
+
+  <div class="options-grid">
+    {% if perms.create_user %}
+    <a href="/superadmin/create-user" class="option-card">
+      <div class="option-icon">👥</div>
+      <h2 class="option-title">Create User</h2>
+      <p class="option-desc">Add new users to the system.</p>
+    </a>
+    {% endif %}
+
+    {% if perms.manage_access %}
+    <a href="/superadmin/access" class="option-card">
+      <div class="option-icon">🔐</div>
+      <h2 class="option-title">Access Management</h2>
+      <p class="option-desc">Grant/revoke feature access.</p>
+    </a>
+    {% endif %}
+
+    {% if perms.main_app %}
+    <a href="/" class="option-card">
+      <div class="option-icon">📊</div>
+      <h2 class="option-title">Main Application</h2>
+      <p class="option-desc">Quotation and Damage Detection Module.</p>
+    </a>
+    {% endif %}
+
+    {% if perms.file_mgmt %}
+    <a href="/files" class="option-card">
+      <div class="option-icon">📁</div>
+      <h2 class="option-title">Report Management</h2>
+      <p class="option-desc">Browse and download reports.</p>
+    </a>
+    {% endif %}
+  </div>
+
+  {% if not (perms.create_user or perms.manage_access or perms.main_app or perms.file_mgmt) %}
+    <div class="no-perms-alert">
+      You currently have no dashboard permissions. Please contact an administrator.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

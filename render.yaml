@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: car-scraper-app
+    runtime: docker
+    plan: starter # Starter plan recommended (2GB RAM) for Selenium stability
+    envVars:
+      - key: PORT
+        value: 5000
+      - fromContext: env_file # This pulls from your Render environment variables Dashboard

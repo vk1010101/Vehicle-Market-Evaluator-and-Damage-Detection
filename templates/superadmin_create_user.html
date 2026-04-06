@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Create User{% endblock %}
+
+{% block content %}
+<div class="dash-container" style="max-width: 680px;">
+  <h1 class="welcome-title" style="text-align: center;">Create New User</h1>
+
+  {% if message %}
+    <div class="form-flash form-flash-success">
+      {{ message }}
+    </div>
+  {% endif %}
+  {% if error %}
+    <div class="form-flash form-flash-error">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  <form method="POST" class="form-card">
+    <!-- Username -->
+    <div class="form-group">
+      <label for="username">Username</label>
+      <input name="username" id="username" class="form-input" required>
+    </div>
+
+    <!-- Password -->
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input name="password" id="password" type="password" class="form-input" required>
+    </div>
+
+    <!-- Active -->
+    <div class="form-group">
+      <label for="active">Active</label>
+      <select name="active" id="active" class="form-input">
+        <option value="1" selected>Yes</option>
+        <option value="0">No</option>
+      </select>
+    </div>
+
+    <!-- Dashboard Access Flags -->
+    <fieldset class="form-fieldset">
+      <legend>Dashboard Access Flags</legend>
+      <div class="fieldset-content">
+        <label class="form-checkbox">
+          <input type="checkbox" name="can_create_user">
+          <span>Create User</span>
+        </label>
+        <label class="form-checkbox">
+          <input type="checkbox" name="can_manage_access">
+          <span>User Access Management</span>
+        </label>
+        <label class="form-checkbox">
+          <input type="checkbox" name="can_use_main_app" checked>
+          <span>Main App</span>
+        </label>
+        <label class="form-checkbox">
+          <input type="checkbox" name="can_file_mgmt">
+          <span>File Management</span>
+        </label>
+      </div>
+    </fieldset>
+
+    <!-- Actions -->
+    <div class="form-actions">
+      <button type="submit" class="form-btn-primary">
+        Create User
+      </button>
+      <a href="/dashboard" class="form-btn-secondary">
+        Back to Dashboard
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}

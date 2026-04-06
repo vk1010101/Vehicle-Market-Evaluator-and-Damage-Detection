@@ -1,0 +1,43 @@
+{% if clean_prices is not defined %}
+{% set clean_prices = results|map(attribute='Price')|select('defined')|map('parse_price')|select('number')|list %}
+{% endif %}
+{% set highest = clean_prices|max if clean_prices else 0 %}
+{% set lowest = clean_prices|min if clean_prices else 0 %}
+{% set avg = (clean_prices|sum / clean_prices|length)|round(2) if clean_prices else 0 %}
+
+<div class="bg-white rounded-2xl shadow-md p-6 border-t-4 border-[#853a61]">
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+    <h3 class="text-lg font-bold text-gray-800">Collective Price Summary</h3>
+    <span class="text-xs text-gray-400 uppercase font-bold tracking-tight">Market Analytics</span>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="p-3 border-l-2 border-gray-100">
+      <span class="text-xs text-gray-400 font-bold uppercase">Lowest</span>
+      <p class="text-xl font-bold text-gray-700">OMR {{ "{:,.0f}".format(lowest) }}</p>
+    </div>
+    <div class="p-3 border-l-2 border-[#853a61]">
+      <span class="text-xs text-[#853a61] font-bold uppercase">Average</span>
+      <p class="text-2xl font-bold text-gray-900">OMR {{ "{:,.0f}".format(avg) }}</p>
+    </div>
+    <div class="p-3 border-l-2 border-gray-100">
+      <span class="text-xs text-gray-400 font-bold uppercase">Highest</span>
+      <p class="text-xl font-bold text-gray-700">OMR {{ "{:,.0f}".format(highest) }}</p>
+    </div>
+  </div>
+
+  {% if highest > lowest %}
+  <!-- Price Range Bar (Sweet Spot Visualizer) -->
+  <div class="space-y-1">
+    <div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden flex relative">
+      {% set percent = ((avg - lowest) / (highest - lowest) * 100)|round %}
+      <div style="width: {{ percent }}%" class="h-full bg-[#853a61] transition-all"></div>
+    </div>
+    <div class="flex justify-between text-[10px] text-gray-400 uppercase font-bold px-0.5">
+      <span>{{ "{:,.0f}".format(lowest) }}</span>
+      <span class="text-[#853a61]">Avg: {{ "{:,.0f}".format(avg) }}</span>
+      <span>{{ "{:,.0f}".format(highest) }}</span>
+    </div>
+  </div>
+  {% endif %}
+</div>

@@ -1,0 +1,528 @@
+{% extends "base.html" %}
+{% block title %}Get Quotes for your car{% endblock %}
+
+{% block content %}
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-content">
+        <div id="etaTimer" class="eta-timer">
+            <div id="etaRing" class="eta-ring"></div>
+            <div class="eta-value-wrapper">
+                <span id="etaValue">--:--</span>
+            </div>
+        </div>
+        <h3 class="loading-title">Processing Your Search...</h3>
+        
+        <div class="progress-bar-wrapper">
+            <div id="progressBar" class="progress-bar"></div>
+        </div>
+        
+        <div id="progressSteps" class="progress-steps-container">
+            <div class="progress-step" data-module="preparing"><span class="status-icon">⏳</span> Preparing Search...</div>
+            <div class="progress-step" data-module="damage_detection"><span class="status-icon">⏳</span> Damage Detection</div>
+            <div class="progress-step" data-module="drivearabia"><span class="status-icon">⏳</span> DriveArabia</div>
+            <div class="progress-step" data-module="opensooq"><span class="status-icon">⏳</span> OpenSooq</div>
+            <div class="progress-step" data-module="yallamotor"><span class="status-icon">⏳</span> YallaMotor</div>
+            <div class="progress-step" data-module="google_image"><span class="status-icon">⏳</span> Google Image Check</div>
+            <div class="progress-step" data-module="insurance_lookup"><span class="status-icon">⏳</span> Insurance Lookup</div>
+            <div class="progress-step" data-module="results"><span class="status-icon">⏳</span> Fetching Results</div>
+        </div>
+        
+        <div class="loading-footer">This may take a few minutes...</div>
+    </div>
+</div>
+
+<div class="dash-container" style="max-width: 960px;">
+    <h1 class="welcome-title" style="text-align: center;">Get Quotes For Your Car</h1>
+    <form id="searchForm" action="/search" method="post" enctype="multipart/form-data" class="form-card">
+        
+        <div class="search-form-grid">
+            <!-- Left Column -->
+            <div class="search-form-col">
+                <fieldset class="form-fieldset">
+                    <legend>Data Sources</legend>
+                    <div class="fieldset-content compact">
+                        <label class="form-checkbox"><input type="checkbox" id="drivearabiaCheck" name="source" value="drivearabia" checked><span>DriveArabia</span></label>
+                        <label class="form-checkbox"><input type="checkbox" id="yallamotorCheck" name="source" value="yallamotor" checked><span>YallaMotor</span></label>
+                        <label class="form-checkbox"><input type="checkbox" id="opensooqCheck" name="source" value="opensooq" checked><span>OpenSooq</span></label>
+                    </div>
+                </fieldset>
+        
+                <fieldset class="form-fieldset">
+                    <legend>Additional Checks</legend>
+                    <div class="fieldset-content compact">
+                        <label class="form-checkbox"><input type="checkbox" id="googleImageCheck" name="google_image_check" value="1" checked><span>Google Image</span></label>
+                        <label class="form-checkbox"><input type="checkbox" id="insuranceCheck" name="insurance_lookup" value="1" checked><span>Insurance Lookup</span></label>
+                        <label class="form-checkbox"><input type="checkbox" id="damageCheck" name="damage_detection" value="1" checked><span>Damage Detection</span></label>
+                    </div>
+                </fieldset>
+            </div>
+
+            <!-- Right Column -->
+            <div class="search-form-col">
+                <div class="form-group compact">
+                    <label for="case_id">Quotation ID (Optional)</label>
+                    <input name="case_id" id="case_id" class="form-input" placeholder="e.g., quote123">
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group compact">
+                        <label for="user_email">Email</label>
+                        <input type="email" name="user_email" id="user_email" class="form-input" placeholder="e.g., john@email.com" required>
+                    </div>
+                    <div class="form-group compact">
+                        <label for="user_mobile">Mobile Number</label>
+                        <input type="tel" name="user_mobile" id="user_mobile" class="form-input" placeholder="e.g., 9876543210" required>
+                    </div>
+                </div>
+                
+                <div id="carSearchFields">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group compact relative">
+                            <label for="make">Make</label>
+                            <input type="text" name="make" id="make" class="form-input" placeholder="Type or select a make" autocomplete="off" />
+                            <button type="button" id="makeDropdownBtn" class="dropdown-btn">▼</button>
+                            <ul id="makeSuggestions" class="suggestions-list"></ul>
+                        </div>
+                        <div class="form-group compact relative">
+                            <label for="model">Model</label>
+                            <input type="text" name="model_value" id="model" class="form-input" placeholder="Type or select a model" autocomplete="off" disabled />
+                            <button type="button" id="modelDropdownBtn" class="dropdown-btn">▼</button>
+                            <ul id="modelSuggestions" class="suggestions-list"></ul>
+                        </div>
+                    </div>
+                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group compact">
+                            <label for="body_type">Body Type</label>
+                            <input name="body_type" id="body_type" class="form-input" placeholder="SUV, Sedan, etc.">
+                        </div>
+                         <div class="form-group compact">
+                            <label for="trim">Trim</label>
+                            <input name="trim" id="trim" class="form-input" placeholder="e.g., Limited, Sport">
+                        </div>
+                    </div>
+                    <div style="display: none;">
+                        <input name="price_min"><input name="price_max">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group compact">
+                            <label for="year">Year</label>
+                            <input name="year" id="year" class="form-input" type="number" placeholder="e.g., 2020">
+                        </div>
+                        <div class="form-group compact">
+                            <label for="odometer_reading">Odometer (km)</label>
+                            <input name="odometer_reading" id="odometer_reading" class="form-input" type="number" placeholder="e.g., 50000">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="chassisFields">
+                    <div class="form-group compact">
+                        <label for="chasis_no">Chassis Number (VIN)</label>
+                        <input name="chasis_no" id="chasis_no" class="form-input" placeholder="e.g., 2H2XAxxxxxxxxxxxx">
+                    </div>
+                </div>
+                
+                <div id="damageSection" class="form-group compact hidden">
+                    <label>Damage Detection Images</label>
+                    <div class="file-drop-area">
+                        <span>Drop images here or</span>
+                        <button type="button" id="selectFilesBtn" class="form-btn-secondary" style="flex:none; padding: 8px 16px;">Select Files</button>
+                        <span id="uploadedCount" class="file-count"></span>
+                        <input type="file" name="damageFile" id="damageFile" class="hidden" multiple />
+                    </div>
+                    <div id="uploadedList" class="file-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="form-btn-primary" style="width: 100%; margin-top: 1rem;">Search</button>
+    </form>
+</div>
+
+<script>
+    // This script is restored from the original page to maintain dynamic functionality
+    const form = document.querySelector("form");
+    const priceMin = form.querySelector("input[name='price_min']");
+    const priceMax = form.querySelector("input[name='price_max']");
+    const submitBtn = form.querySelector("button[type='submit']");
+
+    const priceError = document.createElement("div");
+    priceError.className = "form-error-message";
+    if (priceMax && priceMax.parentElement) {
+        priceMax.parentElement.appendChild(priceError);
+    }
+
+    function validateFields() {
+        let valid = true;
+        if (!priceMin || !priceMax) return true;
+        
+        priceError.textContent = "";
+        priceMax.classList.remove("invalid");
+
+        const minPrice = parseInt(priceMin.value);
+        const maxPrice = parseInt(priceMax.value);
+
+        if (!isNaN(minPrice) && !isNaN(maxPrice) && maxPrice < minPrice) {
+            priceError.textContent = "Price Max should be greater than Price Min.";
+            priceMax.classList.add("invalid");
+            valid = false;
+        }
+
+        submitBtn.disabled = !valid;
+        return valid;
+    }
+    
+    if (priceMin && priceMax) {
+        [priceMin, priceMax].forEach(input => {
+            input.addEventListener("input", validateFields);
+        });
+        validateFields();
+    }
+
+    function toggleFields() {
+        const hasCarScrapers = document.getElementById("drivearabiaCheck").checked || 
+                                document.getElementById("yallamotorCheck").checked || 
+                                document.getElementById("opensooqCheck").checked;
+        const needsChassis = document.getElementById("googleImageCheck").checked || 
+                            document.getElementById("insuranceCheck").checked;
+        const needsDamage = document.getElementById("damageCheck").checked;
+
+        const carFields = document.getElementById("carSearchFields");
+        if (carFields) carFields.style.display = hasCarScrapers ? "block" : "none";
+        
+        const chassisFields = document.getElementById("chassisFields");
+        if (chassisFields) chassisFields.style.display = needsChassis ? "block" : "none";
+        
+        const damageSection = document.getElementById("damageSection");
+        if (damageSection) damageSection.style.display = needsDamage ? "block" : "none";
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const checkboxes = ["drivearabiaCheck", "yallamotorCheck", "opensooqCheck", "googleImageCheck", "insuranceCheck", "damageCheck"];
+        checkboxes.forEach(id => {
+            const checkbox = document.getElementById(id);
+            if (checkbox) checkbox.addEventListener("change", toggleFields);
+        });
+        toggleFields();
+    });
+
+    const selectFilesBtn = document.getElementById("selectFilesBtn");
+    const damageFileInput = document.getElementById("damageFile");
+    if(selectFilesBtn) {
+        selectFilesBtn.addEventListener("click", () => damageFileInput.click());
+    }
+    if(damageFileInput) {
+        damageFileInput.addEventListener("change", function() {
+            const files = damageFileInput.files;
+            const uploadedCount = document.getElementById("uploadedCount");
+            const uploadedList = document.getElementById("uploadedList");
+            if (files.length > 0) {
+                uploadedCount.textContent = files.length + " image" + (files.length > 1 ? "s" : "");
+            } else {
+                uploadedCount.textContent = "";
+            }
+            uploadedList.innerHTML = "";
+            for (let i = 0; i < files.length; i++) {
+                const div = document.createElement("div");
+                div.textContent = files[i].name;
+                uploadedList.appendChild(div);
+            }
+        });
+    }
+
+    let carModels = {};
+    const makeInput = document.getElementById("make");
+    const makeBtn = document.getElementById("makeDropdownBtn");
+    const makeSuggestions = document.getElementById("makeSuggestions");
+    const modelInput = document.getElementById("model");
+    const modelBtn = document.getElementById("modelDropdownBtn");
+    const modelSuggestions = document.getElementById("modelSuggestions");
+
+    fetch('/static/make_model.json')
+    .then(res => res.json())
+    .then(data => {
+        carModels = data || {};
+        updateModelState();
+    });
+
+    function findMakeKey(raw) {
+        if (!raw) return null;
+        if (carModels[raw]) return raw;
+        const lower = raw.toLowerCase();
+        for (const k of Object.keys(carModels)) {
+            if (k.toLowerCase() === lower) return k;
+        }
+        return null;
+    }
+
+    function updateModelState() {
+        const mk = (makeInput.value || "").trim();
+        const key = findMakeKey(mk);
+        if (key) {
+            modelInput.disabled = false;
+        } else {
+            modelInput.disabled = true;
+            modelInput.value = "";
+            if (modelSuggestions) modelSuggestions.style.display = 'none';
+        }
+    }
+
+    function populateSuggestions(container, items, onSelect) {
+        if (!container) return;
+        container.innerHTML = '';
+        items.forEach(item => {
+            const li = document.createElement('li');
+            li.textContent = item;
+            li.addEventListener('click', () => onSelect(item));
+            container.appendChild(li);
+        });
+        container.style.display = items.length ? 'block' : 'none';
+    }
+
+    function showMakeSuggestions(query = '') {
+        if (!makeSuggestions) return;
+        const allMakes = Object.keys(carModels);
+        const q = (query || '').toLowerCase();
+        const matches = q === '' ? allMakes : allMakes.filter(m => m.toLowerCase().includes(q));
+        populateSuggestions(makeSuggestions, matches, sel => {
+            makeInput.value = sel;
+            makeSuggestions.style.display = 'none';
+            updateModelState();
+            modelInput.value = '';
+            modelInput.focus();
+            showModelSuggestions('');
+        });
+    }
+
+    function showModelSuggestions(query = '') {
+        if (!modelSuggestions) return;
+        const mkKey = findMakeKey(makeInput.value.trim());
+        if (!mkKey || !carModels[mkKey]) {
+            modelSuggestions.style.display = 'none';
+            return;
+        }
+        const q = (query || '').toLowerCase();
+        const models = carModels[mkKey] || [];
+        const matches = q === '' ? models : models.filter(m => m.toLowerCase().includes(q));
+        populateSuggestions(modelSuggestions, matches, sel => {
+            modelInput.value = sel;
+            modelSuggestions.style.display = 'none';
+        });
+    }
+
+    if (makeInput) {
+        makeInput.addEventListener('input', () => {
+            updateModelState();
+            showMakeSuggestions(makeInput.value.trim());
+        });
+        makeInput.addEventListener('focus', () => showMakeSuggestions(makeInput.value.trim()));
+    }
+    if (makeBtn) {
+        makeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (makeSuggestions.style.display === 'none') showMakeSuggestions('');
+            else makeSuggestions.style.display = 'none';
+        });
+    }
+    if (modelInput) {
+        modelInput.addEventListener('input', () => showModelSuggestions(modelInput.value.trim()));
+        modelInput.addEventListener('focus', () => {
+            if (!modelInput.disabled) showModelSuggestions(modelInput.value.trim());
+        });
+    }
+    if (modelBtn) {
+        modelBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (modelInput.disabled) return;
+            if (modelSuggestions.style.display === 'none') {
+                showModelSuggestions('');
+                modelInput.focus();
+            } else modelSuggestions.style.display = 'none';
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        if (makeSuggestions && !makeSuggestions.contains(e.target) && e.target !== makeInput && e.target !== makeBtn) {
+            makeSuggestions.style.display = 'none';
+        }
+        if (modelSuggestions && !modelSuggestions.contains(e.target) && e.target !== modelInput && e.target !== modelBtn) {
+            modelSuggestions.style.display = 'none';
+        }
+    });
+
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const searchForm = document.getElementById('searchForm');
+    const progressSteps = document.querySelectorAll('.progress-step');
+    const progressBar = document.getElementById('progressBar');
+    let countdownInterval = null;
+    let timeRemainingSec = 0;
+    let countdownTotalSec = 0;
+
+    function formatMMSS(totalSec) {
+        const m = Math.floor(totalSec / 60);
+        const s = Math.max(0, totalSec % 60);
+        return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+    }
+
+    function startCountdown(totalSec) {
+        const etaEl = document.getElementById('etaValue');
+        const ringEl = document.getElementById('etaRing');
+        if (!etaEl || !ringEl) return;
+        if (countdownInterval) clearInterval(countdownInterval);
+        countdownTotalSec = Math.max(1, Math.floor(totalSec));
+        timeRemainingSec = countdownTotalSec;
+        etaEl.textContent = formatMMSS(timeRemainingSec);
+        ringEl.style.background = `conic-gradient(var(--brand-mid) 0%, var(--field-bg) 0%)`;
+        countdownInterval = setInterval(() => {
+            timeRemainingSec -= 1;
+            if (timeRemainingSec < 0) timeRemainingSec = 0;
+            etaEl.textContent = formatMMSS(timeRemainingSec);
+            const done = (countdownTotalSec - timeRemainingSec);
+            const pct = Math.min(100, Math.max(0, Math.round((done / countdownTotalSec) * 100)));
+            ringEl.style.background = `conic-gradient(var(--brand-mid) ${pct}%, var(--field-bg) 0%)`;
+            if (timeRemainingSec <= 0) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+        }, 1000);
+    }
+
+    function showLoading() {
+        loadingOverlay.style.display = 'flex';
+        searchForm.style.pointerEvents = 'none';
+        searchForm.style.opacity = '0.6';
+        
+        progressSteps.forEach(step => {
+            step.classList.remove('active', 'completed');
+            step.querySelector('.status-icon').textContent = '⏳';
+        });
+        progressBar.style.width = '0%';
+        
+        setTimeout(() => {
+            updateProgress('preparing', 'active');
+            updateProgressBar(5);
+        }, 100);
+    }
+
+    function hideLoading() {
+        loadingOverlay.style.display = 'none';
+        searchForm.style.pointerEvents = 'auto';
+        searchForm.style.opacity = '1';
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+        }
+    }
+
+    function updateProgress(moduleName, status) {
+        const step = document.querySelector(`[data-module="${moduleName}"]`);
+        if (!step) return;
+        step.classList.remove('active', 'completed');
+        
+        switch (status) {
+            case 'active':
+                step.classList.add('active');
+                step.querySelector('.status-icon').textContent = '🔄';
+                break;
+            case 'completed':
+                step.classList.add('completed');
+                step.querySelector('.status-icon').textContent = '✅';
+                break;
+        }
+    }
+
+    function updateProgressBar(percentage) {
+        if (progressBar) progressBar.style.width = `${percentage}%`;
+    }
+
+    function completeAllSteps() {
+        progressSteps.forEach(step => {
+            if (step.style.display !== 'none') {
+                step.classList.add('completed');
+                step.querySelector('.status-icon').textContent = '✅';
+            }
+        });
+        updateProgressBar(100);
+    }
+
+    searchForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        if (typeof validateFields === 'function' && !validateFields()) {
+            return;
+        }
+
+        const selectedSources = Array.from(document.querySelectorAll('input[name="source"]:checked')).map(cb => cb.value);
+        const googleImageCheck = document.getElementById('googleImageCheck').checked;
+        const insuranceLookup = document.getElementById('insuranceCheck').checked;
+        const damageDetection = document.getElementById('damageCheck').checked;
+
+        showLoading();
+
+        progressSteps.forEach(step => {
+            const moduleName = step.getAttribute('data-module');
+            if (moduleName === 'results' || moduleName === 'preparing') {
+                step.style.display = 'block';
+            } else if (moduleName === 'drivearabia' || moduleName === 'opensooq' || moduleName === 'yallamotor') {
+                step.style.display = selectedSources.includes(moduleName) ? 'block' : 'none';
+            } else if (moduleName === 'google_image') {
+                step.style.display = googleImageCheck ? 'block' : 'none';
+            } else if (moduleName === 'insurance_lookup') {
+                step.style.display = insuranceLookup ? 'block' : 'none';
+            } else if (moduleName === 'damage_detection') {
+                step.style.display = damageDetection ? 'block' : 'none';
+            }
+        });
+
+        try {
+            const visibleSteps = Array.from(document.querySelectorAll('.progress-step')).filter(s => s.style.display !== 'none');
+            const totalSeconds = (visibleSteps.length || 1) * 40;
+            startCountdown(totalSeconds);
+        } catch (err) {}
+
+        startSimulatedProgress(selectedSources, googleImageCheck, insuranceLookup, damageDetection);
+
+        try {
+            const formData = new FormData(searchForm);
+            const resp = await fetch('/search', { method: 'POST', body: formData });
+            const html = await resp.text();
+            document.open();
+            document.write(html);
+            document.close();
+        } catch (err) {
+            hideLoading();
+            alert('Search failed. Please try again.');
+        }
+    });
+
+    function startSimulatedProgress(selectedSources, googleImageCheck, insuranceLookup, damageDetection) {
+        const orderedSteps = [
+            'preparing',
+            ...(damageDetection ? ['damage_detection'] : []),
+            ...(selectedSources.includes('drivearabia') ? ['drivearabia'] : []),
+            ...(selectedSources.includes('opensooq') ? ['opensooq'] : []),
+            ...(selectedSources.includes('yallamotor') ? ['yallamotor'] : []),
+            ...(googleImageCheck ? ['google_image'] : []),
+            ...(insuranceLookup ? ['insurance_lookup'] : []),
+            'results'
+        ];
+        let idx = 0;
+        updateProgress('preparing', 'active');
+        const progressInterval = setInterval(() => {
+            if (idx > 0 && idx - 1 < orderedSteps.length) {
+                updateProgress(orderedSteps[idx - 1], 'completed');
+            }
+            if (idx < orderedSteps.length) {
+                updateProgress(orderedSteps[idx], 'active');
+                const pct = Math.min(99, Math.round(((idx + 1) / (orderedSteps.length + 1)) * 100));
+                updateProgressBar(pct);
+                idx++;
+            } else {
+                clearInterval(progressInterval);
+                completeAllSteps();
+            }
+        }, 40000);
+    }
+</script>
+{% endblock %}

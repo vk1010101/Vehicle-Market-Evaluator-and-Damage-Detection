@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Car Quote Results Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+    .sticky-header th { position: sticky; top: 0; background: #f8fafc; z-index: 2; }
+    .mini-table { font-size: 13px; }
+    .pro-btn { font-size: 14px; font-weight: 500; border-radius: 6px; transition: background .18s; }
+    .pro-btn-green { background: #22c55e; color: #fff; }
+    .pro-btn-green:hover { background: #16a34a; }
+    .pro-btn-blue { background: #2563eb; color: #fff; }
+    .pro-btn-blue:hover { background: #1d4ed8; }
+    .pro-btn-black { background: #18181b; color: #fff; }
+    .pro-btn-black:hover { background: #52525b; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-spin { animation: spin 0.9s linear infinite; }
+    
+    /* Disabled button styles */
+    .pro-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: #9ca3af !important;
+    }
+    
+    .pro-btn:disabled:hover {
+      background: #9ca3af !important;
+    }
+    /* Modal transition styles */
+    .modal-enter-active, .modal-leave-active {
+      transition: opacity 0.3s ease;
+    }
+    .modal-enter-from, .modal-leave-to {
+      opacity: 0;
+    }
+    .modal-content-enter-active, .modal-content-leave-active {
+      transition: all 0.3s ease;
+    }
+    .modal-content-enter-from, .modal-content-leave-to {
+      transform: scale(0.9);
+      opacity: 0;
+    }
+  </style>
+</head>
+  <body class="bg-gray-100 min-h-screen">
+    <header style="background-color: #853a61; box-shadow: 0 2px 4px rgba(133, 58, 97, 0.1);">
+      <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between" style="height: 70px;">
+        <a href="/dashboard" class="text-2xl font-bold text-white" style="text-decoration: none;">Dhofar Insurance</a>
+        <div class="text-sm text-white flex items-center gap-6">
+          <span>Logged in as <span class="font-semibold">{{ session.get('username', 'admin') }}</span></span>
+          <a href="/logout" 
+             style="background-color: white; color: #853a61; border-radius: 7px; padding: 8px 16px; text-decoration: none; font-weight: 500; transition: background-color 0.2s;"
+             onmouseover="this.style.backgroundColor='#ffe6d9'"
+             onmouseout="this.style.backgroundColor='white'">Logout</a>
+        </div>
+      </div>
+    </header>
+    <div class="max-w-7xl mx-auto px-4 pt-8">
+      <h1 class="text-3xl font-bold text-center mb-8 tracking-tight">Car Quote Results</h1>
+    <div class="flex justify-between items-center mb-6">
+      <a href="/" class="text-blue-600 hover:underline text-base">&larr; New Search</a>
+      <div>
+                        <span class="text-gray-700 font-medium mr-2">Quotation ID:</span>
+        <span class="text-gray-500">{{ session.get('case_id','') }}</span>
+        <button class="ml-3 px-3 py-1 bg-gray-100 border rounded hover:bg-gray-200" onclick="location.reload()">Refresh All</button>
+      </div>
+    </div>
+
+    <!-- Conditional Collective Summary (shown only if 2+ car scrapers selected) -->
+    {% if results %}
+    {% set ns = namespace(count=0) %}
+    {% for s in (criteria.sources or []) %}
+      {% if s in ['drivearabia','yallamotor','opensooq'] %}
+        {% set ns.count = ns.count + 1 %}
+      {% endif %}
+    {% endfor %}
+    {% if ns.count >= 2 %}
+    <div id="collective-summary-block" class="mb-10">
+      {% include "partials/collective_summary.html" %}
+    </div>
+    {% endif %}
+    {% endif %}
+    
+    <!-- Car Scraping Results Section - Only show if selected -->
+    {% if criteria.sources %}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-7 mb-10">
+      {% if "opensooq" in criteria.sources %}
+      <div id="card-opensooq">
+        {% set source_results = results|selectattr('Source','equalto','OpenSooq')|list %}
+        {% include "partials/opensooq_card.html" %}
+      </div>
+      {% endif %}
+      
+      {% if "yallamotor" in criteria.sources %}
+      <div id="card-yallamotor">
+        {% set source_results = results|selectattr('Source','equalto','YallaMotor')|list %}
+        {% include "partials/yallamotor_card.html" %}
+      </div>
+      {% endif %}
+      
+      {% if "drivearabia" in criteria.sources %}
+      <div id="card-drivearabia">
+        {% set source_results = results|selectattr('Source','equalto','DriveArabia')|list %}
+        {% include "partials/drivearabia_card.html" %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Independent Modules Section - Only show if selected -->
+    {% if criteria.insurance_lookup or criteria.google_image_check or criteria.damage_detection %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-7 text-sm items-start mb-10">
+
+      <div class="space-y-6 flex flex-col">
+        <!-- Google Image Check Card - Only show if selected -->
+        {% if criteria.google_image_check %}
+        <div id="card-google_image">{% include "partials/google_image_card.html" %}</div>
+        {% endif %}
+        
+        <!-- Insurance Card - Only show if selected -->
+        {% if criteria.insurance_lookup %}
+        <div id="card-insurance_lookup">{% include "partials/insurance_card.html" %}</div>
+        {% endif %}
+      </div>
+
+      <!-- Right Column: Damage (if enabled) + Action Buttons (always) -->
+      <div class="space-y-6 flex flex-col h-full">
+        {% if criteria.damage_detection %}
+        <div id="card-damage_detection" class="flex-1">
+          {% with damage_result=damage_result %}
+            {% include "partials/damage_card.html" %}
+          {% endwith %}
+        </div>
+        {% endif %}
+
+        <!-- Action Buttons - Always show here -->
+        <div class="bg-white rounded-2xl shadow-md p-6 flex flex-col items-center">
+          <div class="grid grid-cols-2 gap-3 w-full max-w-xs mb-2">
+            <form id="sendEmailForm" class="col-span-1" style="width:100%;">
+              <button
+                type="submit"
+                id="sendEmailBtn"
+                class="pro-btn px-5 py-2 w-full opacity-50 cursor-not-allowed"
+                style="background: #ea580c; color: #fff; border-radius: 6px; font-weight: 500; font-size: 14px; transition: background .18s;"
+                onmouseover="this.style.background='#ea580c';"
+                onmouseout="this.style.background='#ea580c';"
+                disabled
+                title="Please submit rating first"
+              >
+                 SEND EMAIL
+              </button>
+            </form>
+            <button class="pro-btn pro-btn-black px-5 py-2 w-full col-span-1" onclick="handleSubmitClick()" id="mainSubmitBtn">SUBMIT</button>
+          </div>
+          <div id="submitResult" class="text-green-700 hidden"></div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not (criteria.insurance_lookup or criteria.google_image_check or criteria.damage_detection) %}
+    <!-- Only scrapers selected → show Action Buttons block -->
+    <div class="bg-white rounded-2xl shadow-md p-6 flex flex-col items-center mb-8">
+      <div class="grid grid-cols-2 gap-3 w-full max-w-xs mb-2">
+        <form id="sendEmailForm" class="col-span-1" style="width:100%;">
+          <button
+            type="submit"
+            id="sendEmailBtn"
+            class="pro-btn px-5 py-2 w-full opacity-50 cursor-not-allowed"
+            style="background: #ea580c; color: #fff; border-radius: 6px; font-weight: 500; font-size: 14px; transition: background .18s;"
+            onmouseover="this.style.background='#ea580c';"
+            onmouseout="this.style.background='#ea580c';"
+            disabled
+            title="Please submit rating first"
+          >
+             SEND EMAIL
+          </button>
+        </form>
+        <button class="pro-btn pro-btn-black px-5 py-2 w-full col-span-1" onclick="handleSubmitClick()" id="mainSubmitBtn">SUBMIT</button>
+      </div>
+      <div id="submitResult" class="text-green-700 hidden"></div>
+    </div>
+    {% endif %}
+    
+    <!-- Modal -->
+    <div id="submitModal" class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center hidden z-50 modal-leave-to">
+      <div class="bg-white rounded-xl shadow-lg p-6 w-80 modal-content-leave-to">
+        <h2 class="text-lg font-semibold mb-4">Submit Status</h2>
+        <form id="ratingForm">
+          <div class="flex gap-6 mb-4">
+            <label><input type="radio" name="status" value="Approved" checked onchange="handleStatusChange()"> Approve</label>
+            <label><input type="radio" name="status" value="Rejected" onchange="handleStatusChange()"> Reject</label>
+          </div>
+          
+          <!-- Approved Value Field (shown when Approve is selected) -->
+          <div id="approvedValueBox" class="mb-4">
+            <label for="approvedValue" class="block mb-1">Approved Value <span class="text-red-600">*</span></label>
+            <input type="number" id="approvedValue" step="0.01" min="0" class="w-full border rounded p-2" placeholder="Enter amount in OMR">
+          </div>
+          
+          <!-- Remarks Box (shown for both Approve and Reject) -->
+          <div id="remarksBox" class="mb-4 hidden">
+            <label for="remarks" class="block mb-1">Remarks <span id="remarksRequired" class="text-red-600">*</span></label>
+            <textarea id="remarks" rows="2" class="w-full border rounded p-2" placeholder="Enter remarks (optional for approval)"></textarea>
+          </div>
+          
+          <div class="flex justify-end gap-2">
+            <button type="button" class="bg-gray-300 px-4 py-1 rounded" onclick="hideModal()">Cancel</button>
+            <button type="button" class="pro-btn pro-btn-blue px-5 py-1" onclick="submitRating(caseId)">Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS for AJAX card refresh, modal, and preview -->
+  <script>
+    // Store case_id in JavaScript variable to avoid template syntax issues
+    const caseId = {{ session.get("case_id", "") | tojson }};
+    
+    // Initialize form on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      handleStatusChange(); // Set initial state
+      checkExistingRating(); // Check if rating already exists
+    });
+    
+    function checkExistingRating() {
+      // Check if rating already exists for this session
+      if (caseId) {
+        fetch(`/check_rating_exists/${caseId}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.exists) {
+              // Rating exists - disable submit button and show message
+              const submitBtn = document.getElementById('mainSubmitBtn');
+              submitBtn.disabled = true;
+              submitBtn.textContent = 'Submitted';
+              submitBtn.title = 'Rating already submitted for this case';
+              
+              // Enable SEND EMAIL button since rating exists
+              const sendEmailBtn = document.getElementById('sendEmailBtn');
+              sendEmailBtn.disabled = false;
+              sendEmailBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+              sendEmailBtn.title = 'Send email report';
+              
+              // Show existing rating info
+              const div = document.getElementById("submitResult");
+              div.classList.remove('hidden');
+              div.innerHTML = `Status: <b>${data.rating.status}</b><br>Already submitted on: ${data.rating.timestamp}<br><br>📧 <b>SEND EMAIL is enabled!</b>`;
+            }
+          })
+          .catch(() => {
+            // Error checking - assume no rating exists
+          });
+      }
+    }
+    
+    function autoGenerateReports() {
+      console.log("📊 Starting auto-generation of reports...");
+      
+      // First, generate Excel export
+      generateExcelExport()
+        .then(() => {
+          console.log("✅ Excel export completed, now generating PDF...");
+          // Then generate PDF
+          return generatePDF();
+        })
+        .then(() => {
+          console.log("✅ PDF generation completed");
+          // Enable SEND EMAIL button after both reports are generated
+          const sendEmailBtn = document.getElementById('sendEmailBtn');
+          sendEmailBtn.disabled = false;
+          sendEmailBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          sendEmailBtn.title = 'Send email report';
+          
+          // Show success message
+          const div = document.getElementById("submitResult");
+          const currentContent = div.innerHTML;
+          div.innerHTML = currentContent + '<br><br>📋 <b>Reports Downloaded:</b><br>✅ Excel Export <br>✅ PDF Report <br><br>';
+        })
+        .catch((error) => {
+          console.error("❌ Error in auto-generation:", error);
+          // Show error message but still enable SEND EMAIL
+          const sendEmailBtn = document.getElementById('sendEmailBtn');
+          sendEmailBtn.disabled = false;
+          sendEmailBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          sendEmailBtn.title = 'Send email report';
+          
+          const div = document.getElementById("submitResult");
+          const currentContent = div.innerHTML;
+          div.innerHTML = currentContent + '<br><br>⚠️ <b>Report download had issues:</b><br>' + error.message + '<br><br>📧 <b>SEND EMAIL is still enabled!</b>';
+        });
+    }
+    
+    function generateExcelExport() {
+      return new Promise((resolve, reject) => {
+        console.log("📊 Generating Excel export...");
+        // Create a download link for the existing Excel file
+        const link = document.createElement('a');
+        try {
+          link.href = '{{ session.get("excel_web_path", "/static/results.xlsx") }}';
+        } catch (e) {
+          link.href = '/static/results.xlsx';
+        }
+        link.download = 'results.xlsx';
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setTimeout(() => {
+          console.log("✅ Excel export downloaded");
+          resolve();
+        }, 1000);
+      });
+    }
+    
+    function generatePDF() {
+      return new Promise((resolve, reject) => {
+        console.log("📄 Generating PDF...");
+        fetch("/generate_pdf")
+          .then(async (response) => {
+            const ct = (response.headers.get('Content-Type') || '').toLowerCase();
+            if (!response.ok) {
+              // Try to read server error text/json for better message
+              let msg = 'PDF generation failed';
+              try {
+                if (ct.includes('application/json')) {
+                  const j = await response.json();
+                  msg = j.message || msg;
+                } else {
+                  msg = await response.text();
+                }
+              } catch (e) {}
+              throw new Error(msg);
+            }
+            if (!ct.includes('application/pdf')) {
+              // Server did not return a PDF; read text for diagnostics
+              let msg = 'Server did not return a PDF';
+              try { msg = await response.text(); } catch (e) {}
+              throw new Error(msg);
+            }
+            return response.blob();
+          })
+          .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `report_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.pdf`;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            console.log("✅ PDF downloaded successfully");
+            resolve();
+          })
+          .catch(error => {
+            console.error("❌ PDF generation/download error:", error);
+            reject(error);
+          });
+      });
+    }
+    
+    function showModal() {
+      const modal = document.getElementById('submitModal');
+      const modalContent = modal.querySelector('.modal-content-leave-to');
+      modal.classList.remove('hidden', 'modal-leave-to');
+      modal.classList.add('modal-enter-active');
+      if (modalContent) {
+        modalContent.classList.remove('modal-content-leave-to');
+        modalContent.classList.add('modal-content-enter-active');
+      }
+      setTimeout(() => {
+        modal.classList.remove('modal-enter-from');
+        if (modalContent) modalContent.classList.remove('modal-content-enter-from');
+      }, 10);
+    }
+    function hideModal() {
+      const modal = document.getElementById('submitModal');
+      const modalContent = modal.querySelector('.modal-content-enter-active');
+      modal.classList.add('modal-leave-active');
+      if (modalContent) modalContent.classList.add('modal-content-leave-active');
+      setTimeout(() => {
+        modal.classList.add('hidden', 'modal-enter-from', 'modal-leave-to');
+        modal.classList.remove('modal-leave-active', 'modal-enter-active');
+        if (modalContent) {
+          modalContent.classList.add('modal-content-leave-to');
+          modalContent.classList.remove('modal-content-enter-active', 'modal-content-enter-from');
+        }
+      }, 300);
+    }
+    function handleStatusChange() {
+      const val = document.querySelector('input[name="status"]:checked').value;
+      document.getElementById('approvedValueBox').style.display = val === 'Approved' ? 'block' : 'none';
+      document.getElementById('remarksBox').style.display = 'block'; // Always show remarks box
+      document.getElementById('approvedValue').required = val === 'Approved';
+      document.getElementById('remarks').required = val === 'Rejected';
+      document.getElementById('remarksRequired').style.display = val === 'Rejected' ? 'inline' : 'none';
+    }
+      
+    function submitRating(quotationId) {
+      const status = document.querySelector('input[name="status"]:checked').value;
+      const remarks = document.getElementById('remarks').value.trim();
+      const approvedValueStr = document.getElementById('approvedValue').value;
+
+      // Validate Approved path
+      if (status === 'Approved' && !approvedValueStr) {
+        alert('Approved Value is required for approved cases.');
+        return;
+      }
+
+      // Send null when Rejected; send a Number when Approved
+      const payload = {
+        case_id: quotationId,
+        status: status,
+        remarks: remarks || null,
+        approvedValue: status === 'Approved' ? Number(approvedValueStr) : null
+      };
+
+      // Disable submit button to prevent multiple clicks
+      const submitBtn = document.querySelector('button[onclick="submitRating(caseId)"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      fetch("/submit_rating", {
+        method: "POST",
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          alert(data.message || 'Submission failed.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit';
+          return;
+        }
+
+        hideModal();
+        const div = document.getElementById("submitResult");
+        div.classList.remove('hidden');
+        let resultText = `Status: <b>${data.status}</b>`;
+        if (data.approvedValue !== null && data.approvedValue !== undefined) {
+          resultText += `<br>Approved Value: <b>OMR ${data.approvedValue}</b>`;
+        }
+        if (data.remarks) {
+          resultText += `<br>Remarks: ${data.remarks}`;
+        }
+        resultText += `<br>Submitted on: ${data.timestamp}`;
+        resultText += `<br>Action by: <b>${data.username || 'Unknown'}</b>`;
+        div.innerHTML = resultText;
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit';
+
+        const mainSubmitBtn = document.getElementById('mainSubmitBtn');
+        mainSubmitBtn.disabled = true;
+        mainSubmitBtn.textContent = 'Submitted';
+        mainSubmitBtn.title = 'Rating already submitted for this case';
+
+        // Auto-generate/download reports
+        autoGenerateReports();
+      })
+      .catch((error) => {
+        hideModal();
+        alert('Submission failed: ' + error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit';
+      });
+    }
+
+
+    function viewCar(url) {
+      if (url && url !== "N/A") window.open(url, "_blank");
+    }
+
+    function refreshSource(source, btn) {
+      if (btn) btn.querySelector('.refresh-svg').classList.add("animate-spin");
+      fetch("/refresh_source", {
+        method: "POST",
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({source})
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.html) {
+          document.getElementById('card-' + source).innerHTML = data.html;
+        }
+        // Update collective summary if returned
+        if (data.summary_html) {
+          document.getElementById('collective-summary-block').innerHTML = data.summary_html;
+        }
+      })
+      .finally(() => {
+        if (btn) btn.querySelector('.refresh-svg').classList.remove("animate-spin");
+      });
+    }
+
+    function showDecisionBox() {
+      document.getElementById('decisionBox').classList.remove('hidden');
+      document.getElementById('changeDecisionBtn').classList.add('hidden');
+      document.getElementById('decisionSaved').classList.add('hidden');
+    }
+    function saveDecision() {
+      var selected = document.querySelector('input[name="decision"]:checked');
+      if (selected) {
+        document.getElementById('decisionSaved').classList.remove('hidden');
+        setTimeout(function(){
+          document.getElementById('decisionSaved').classList.add('hidden');
+          document.getElementById('changeDecisionBtn').classList.remove('hidden');
+          document.getElementById('decisionBox').classList.add('hidden');
+        }, 1500);
+      } else {
+        alert('Please select Yes or No!');
+      }
+    }
+    // Image Preview Modal JS
+    function openPreviewModal(imgUrl) {
+      document.getElementById('modalPreviewImage').src = imgUrl;
+      document.getElementById('imagePreviewModal').classList.remove('hidden');
+    }
+    function closePreviewModal(e) {
+      if (e.target.id === 'imagePreviewModal' || e.target.tagName === 'BUTTON') {
+        document.getElementById('imagePreviewModal').classList.add('hidden');
+        document.getElementById('modalPreviewImage').src = '';
+      }
+    }
+
+    function handleSubmitClick() {
+      const submitBtn = document.getElementById('mainSubmitBtn');
+      if (submitBtn.disabled) {
+        alert('You cannot submit again as this case has already been rated.');
+        return;
+      }
+      showModal();
+    }
+  </script>
+
+  <!-- Image Preview Modal -->
+  <div id="imagePreviewModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden" onclick="closePreviewModal(event)">
+    <div class="relative max-w-3xl w-[90vw] max-h-[90vh] flex items-center justify-center">
+      <button onclick="closePreviewModal(event)" class="absolute top-2 right-2 bg-gray-900 bg-opacity-70 text-white text-xl rounded-full w-9 h-9 flex items-center justify-center z-60 hover:bg-red-600">&times;</button>
+      <img id="modalPreviewImage" src="" class="max-h-[80vh] max-w-full rounded-xl border-4 border-white shadow-xl bg-white" />
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('sendEmailForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const btn = this.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.innerText = "Sending...";
+      fetch("/send_report_email", { method: "POST" })
+        .then(resp => {
+          if (resp.ok) {
+            showToast("Report sent successfully!");
+          } else {
+            resp.text().then(t => showToast(t || "Error: Could not send.", true));
+          }
+        })
+        .catch(() => {
+          showToast("Error: Email could not be sent.", true);
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerText = "Send Email";
+        });
+    });
+    
+    // Toast function
+    function showToast(msg, isError) {
+      let toast = document.createElement('div');
+      toast.innerText = msg;
+      toast.style.position = 'fixed';
+      toast.style.top = '36px';
+      toast.style.right = '36px';
+      toast.style.background = isError ? '#dc2626' : '#16a34a';
+      toast.style.color = '#fff';
+      toast.style.padding = '18px 36px';
+      toast.style.borderRadius = '8px';
+      toast.style.fontWeight = 'bold';
+      toast.style.fontSize = '16px';
+      toast.style.boxShadow = '0 2px 10px rgba(0,0,0,.12)';
+      toast.style.zIndex = '9999';
+      toast.style.opacity = '0.95';
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.transition = "opacity .6s";
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 600);
+      }, 2200);
+    }
+    </script>
+    
+</body>
+</html>

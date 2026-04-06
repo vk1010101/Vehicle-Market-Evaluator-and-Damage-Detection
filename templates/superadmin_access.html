@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}User Access Management{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <h1 class="welcome-title" style="text-align: center;">User Access Management</h1>
+
+  {% if message %}
+    <div class="form-flash form-flash-success">
+      {{ message }}
+    </div>
+  {% endif %}
+  {% if error %}
+    <div class="form-flash form-flash-error">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  <form method="POST" class="table-card">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Active</th>
+            <th>Create User</th>
+            <th>Access Mgmt</th>
+            <th>Main App</th>
+            <th>File Mgmt</th>
+            <th>Expiry</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <td data-label="User">{{ u.username }}</td>
+            <td data-label="Active">
+              <select name="active_{{ u.id }}" class="table-select">
+                <option value="1" {% if u.active %}selected{% endif %}>Yes</option>
+                <option value="0" {% if not u.active %}selected{% endif %}>No</option>
+              </select>
+            </td>
+            <td data-label="Create User">
+              <input type="checkbox" name="create_{{ u.id }}" {% if u.can_create_user %}checked{% endif %}>
+            </td>
+            <td data-label="Access Mgmt">
+              <input type="checkbox" name="manage_{{ u.id }}" {% if u.can_manage_access %}checked{% endif %}>
+            </td>
+            <td data-label="Main App">
+              <input type="checkbox" name="main_{{ u.id }}" {% if u.can_use_main_app %}checked{% endif %}>
+            </td>
+            <td data-label="File Mgmt">
+              <input type="checkbox" name="file_{{ u.id }}" {% if u.can_file_mgmt %}checked{% endif %}>
+            </td>
+            <td data-label="Expiry" class="expiry-cell">
+              {% if u.expiry %}{{ u.expiry }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="form-actions" style="padding: 1.5rem;">
+      <button type="submit" class="form-btn-primary" style="flex: 0 1 auto; padding: 12px 24px;">
+        Save Changes
+      </button>
+      <a href="/dashboard" class="form-btn-secondary" style="flex: 0 1 auto; padding: 12px 24px;">
+        Back to Dashboard
+      </a>
+    </div>
+  </form>
+
+  <p class="form-tip">
+    Tip: You can create new users on the <a href="/superadmin/create-user">Create User</a> page.
+  </p>
+</div>
+{% endblock %}

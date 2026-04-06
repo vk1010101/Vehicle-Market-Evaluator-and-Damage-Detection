@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}File Management{% endblock %}
+
+{% block content %}
+<div class="dash-container">
+  <h1 class="welcome-title">File Management</h1>
+
+  <form class="table-card" style="padding: 1.5rem; margin-bottom: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: center;" method="get" action="/files">
+    <input name="q" value="{{ q or '' }}" placeholder="Search Quotation ID..." class="form-input" />
+    <select name="status" class="form-input">
+      <option value="">All Statuses</option>
+        <option value="Approved" {% if status_filter=='Approved' %}selected{% endif %}>Approved</option>
+        <option value="Rejected" {% if status_filter=='Rejected' %}selected{% endif %}>Rejected</option>
+      </select>
+    <button class="form-btn-primary" style="padding: 11px;">Search</button>
+    </form>
+
+  <div class="table-card">
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Quotation ID</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Action By</th>
+            <th>Approved Value</th>
+            <th>Remarks</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if cases %}
+            {% for c in cases %}
+            <tr>
+              <td data-label="Quotation ID" class="font-mono">{{ c.CaseID }}</td>
+              <td data-label="Status">
+                <span class="status-badge status-{{ c.Status.lower() }}">{{ c.Status }}</span>
+              </td>
+              <td data-label="Date">{{ c.Date }}</td>
+              <td data-label="Action By">{{ c.ActionBy }}</td>
+              <td data-label="Approved Value">{{ c.ApprovedValue if c.Status=='Approved' else '—' }}</td>
+              <td data-label="Remarks" class="remarks-cell">{{ c.Remarks }}</td>
+              <td data-label="Actions" class="actions-cell">
+                <a href="/files/generate_pdf/{{ c.CaseID }}" class="action-btn pdf-btn" {% if not c.HasQuotes %}disabled{% endif %}>PDF</a>
+                <a href="/files/send_email/{{ c.CaseID }}" class="action-btn email-btn">Send Email</a>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="7" class="empty-cell">No cases found.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+

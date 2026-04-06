@@ -1,0 +1,45 @@
+<div class="bg-white rounded-2xl shadow-md p-5 space-y-4 relative">
+  <h3 class="font-semibold mb-2 flex items-center gap-2">
+    Google Image Check
+    <button
+      onclick="refreshSource('google_image', this)"
+      class="absolute top-5 right-5 text-gray-400 hover:text-black transition p-1"
+      title="Refresh Google Images"
+      style="line-height: 0;"
+    >
+      <!-- SVG refresh icon -->
+      <svg class="refresh-svg w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4.93 19.07A10 10 0 1 1 12 22v-4m0 4l-4-4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </h3>
+  {% if google_image_result.error %}
+    <p class="text-red-600 text-xs">{{ google_image_result.error }}</p>
+  {% elif google_image_result.found_images or google_image_result.downloaded_images %}
+    <p class="text-green-600 mb-2">
+      {% if google_image_result.gallery_source %}
+        Images from: {{ google_image_result.gallery_source|join(', ') }}
+      {% endif %}
+    </p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 justify-center">
+      {% if google_image_result.found_images %}
+        {% for img in google_image_result.found_images %}
+          <img src="{{ img }}" class="w-28 h-20 object-cover rounded border" />
+        {% endfor %}
+      {% else %}
+        {% for img in google_image_result.downloaded_images %}
+          {% set norm = img.replace('\\', '/') %}
+          {% set parts = norm.split('static/') %}
+          {% set rel = parts[1] if parts|length > 1 else norm %}
+          <img src="/static/{{ rel }}" class="w-28 h-20 object-cover rounded border" />
+        {% endfor %}
+      {% endif %}
+    </div>
+    {% if google_image_result.first_gallery_page %}
+      <a href="{{ google_image_result.first_gallery_page }}" target="_blank"
+         class="text-blue-600 underline text-xs">View gallery</a>
+    {% endif %}
+  {% else %}
+    <p class="text-gray-600 text-xs">No images found.</p>
+  {% endif %}
+</div>

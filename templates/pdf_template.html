@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Car Quote Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #aaa; padding: 6px; text-align: left; }
+        h2 { margin-top: 30px; }
+        th { background-color: #f2f2f2; }
+        .summary-box { border: 1px solid #ccc; padding: 10px; margin-bottom: 20px; }
+        .image-pair { display: flex; gap: 20px; margin-bottom: 20px; }
+        .image-block { text-align: center; }
+        .image-block img { width: 150px; height: auto; border: 1px solid #ccc; }
+        .page-break { page-break-before: always; }
+    </style>
+</head>
+<body>
+    <h1>Car Quote Report</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  
+        <!-- Left: Case Details -->
+        <div style="font-size: 1.2em; font-weight: bold;">
+          Case Details
+        </div>
+        
+        <!-- Right: Case Status and Value in same line -->
+        <div style="font-size: 1.2em; font-weight: bold; white-space: nowrap;">
+          CASE DECISION: {{ rating_status or "Not Set" }}</span>
+        </div>
+      
+      </div>
+      
+      
+      </div>
+      
+         
+          <table>
+              {% for key, value in criteria.items() %}
+              <tr>
+                  <th>{{ key.replace('_', ' ').title() }}</th>
+                  <td>{{ value }}</td>
+              </tr>
+              {% endfor %}
+              <tr>
+                <th>User Email</th>
+                <td>{{ session.get('user_email', '') }}</td>
+            </tr>
+            <tr>
+                <th>User Mobile</th>
+                <td>{{ session.get('user_mobile', '') }}</td>
+            </tr>
+              <tr>
+                  <th>Case Status</th>
+                  <td>{{ rating_status or "Not Set" }}</td>
+              </tr>
+              {% if rating_status == 'Approved' and approved_value %}
+              <tr>
+                  <th>Approved Value</th>
+                  <td>OMR {{ approved_value }}</td>
+              </tr>
+              {% endif %}
+              {% if rating_status == 'Rejected' and rating_remarks %}
+              <tr>
+                  <th>Rejection Remarks</th>
+                  <td>{{ rating_remarks }}</td>
+              </tr>
+              {% endif %}
+              {% if rating_remarks and rating_status == 'Approved' %}
+              <tr>
+                  <th>Approval Remarks</th>
+                  <td>{{ rating_remarks }}</td>
+              </tr>
+              {% endif %}
+              {% if rating_submitted_on %}
+              <tr>
+                  <th>Status Set On</th>
+                  <td>{{ rating_submitted_on }}</td>
+              </tr>
+              {% endif %}
+              {% if session.get('username') %}
+              <tr>
+                  <th>Action By</th>
+                  <td>{{ session.get('username') }}</td>
+              </tr>
+              {% endif %}
+          </table>
+        </div>
+        
+      </div>
+
+            
+    <!-- COLLECTIVE PRICE SUMMARY -->
+    {% set all_prices = [] %}
+    {% for car in results %}
+        {% set price_str = car.get('Price', '') %}
+        {% set price = (price_str|replace('OMR', '')|replace(',', '')|trim|float(0)) %}
+        {% if price > 0 %}{% set _ = all_prices.append(price) %}{% endif %}
+    {% endfor %}
+
+    <h2>Collective Price Summary</h2>
+    <table>
+        <tr><th>Highest</th><td>OMR {{ all_prices|max if all_prices else 'N/A' }}</td></tr>
+        <tr><th>Lowest</th><td>OMR {{ all_prices|min if all_prices else 'N/A' }}</td></tr>
+        <tr><th>Average</th><td>OMR {{ (all_prices|sum / all_prices|length)|round(2) if all_prices else 'N/A' }}</td></tr>
+    </table>
+
+    {% for source in ["DriveArabia", "YallaMotor", "OpenSooq"] %}
+        {% set source_results = results | selectattr('Source', 'equalto', source) | list %}
+        {% set prices = [] %}
+        {% for car in source_results %}
+            {% set p = (car['Price']|replace('OMR', '')|replace(',', '')|trim|float(0)) %}
+            {% if p > 0 %}{% set _ = prices.append(p) %}{% endif %}
+        {% endfor %}
+        
+        <h2>{{ source }} Results</h2>
+
+        <table>
+            <tr><th>Highest</th><td>OMR {{ prices|max if prices else 'N/A' }}</td></tr>
+            <tr><th>Lowest</th><td>OMR {{ prices|min if prices else 'N/A' }}</td></tr>
+            <tr><th>Average</th><td>OMR {{ (prices|sum / prices|length)|round(2) if prices else 'N/A' }}</td></tr>
+            <tr><th>Matches</th><td>{{ source_results|length }}</td></tr>
+        </table>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Car Name</th><th>Price</th><th>Body Type</th><th>Kilometers</th><th>Year</th>
+                    {% if source == "DriveArabia" %}
+                    <th>Fuel Efficiency</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+            {% for car in source_results %}
+                <tr>
+                    <td>{{ car.get('Car Name') or car.get('CarName') or car.get('name') or car.get('Title') or '' }}</td>
+                    <td>{{ car['Price'] }}</td>
+                    <td>{{ car['Body Type'] }}</td>
+                    <td>{{ car['Kilometers'] }}</td>
+                    <td>{{ car['Year'] }}</td>
+                    {% if source == "DriveArabia" %}
+                    <td>{{ car['Fuel Efficiency'] }}</td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endfor %}
+
+    <h2>Matches Found</h2>
+    <table>
+        <tr><th>Total</th><td>{{ results|length }}</td></tr>
+        <tr><th>DriveArabia</th><td>{{ results | selectattr('Source', 'equalto', 'DriveArabia') | list | length }}</td></tr>
+        <tr><th>YallaMotor</th><td>{{ results | selectattr('Source', 'equalto', 'YallaMotor') | list | length }}</td></tr>
+        <tr><th>OpenSooq</th><td>{{ results | selectattr('Source', 'equalto', 'OpenSooq') | list | length }}</td></tr>
+    </table>
+
+    {% if damage_images %}
+        
+        <h2>Damage Detection Result</h2>
+        <table border="1" cellspacing="0" cellpadding="10" style="width:100%;">
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Damage Detection Decision</td><td>{{ session.get('damage_decision') or damage_result }}</td></tr>
+            </tbody>
+        </table>
+        
+        <h2><b>Damage Detection Images</b></h2>
+        <table border="1" cellspacing="0" cellpadding="10" style="width:100%; text-align:center;">
+            <thead>
+                <tr>
+                    <th>Original</th>
+                    <th>Processed</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for original, processed in damage_images %}
+                <tr>
+                    <td><img src="{{ original }}" alt="Original Damage Image" width="300" /></td>
+                    <td><img src="{{ processed }}" alt="Processed Damage Image" width="300" /></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+
+    {% if google_image_result and (google_image_result.found_images or downloaded_images) %}
+        <h2>Google Image Check</h2>
+        {% if google_image_result.gallery_source %}
+            <p style="color: #17963b; font-size: 12px;">
+                Images from: {{ google_image_result.gallery_source|join(', ') }}
+            </p>
+        {% endif %}
+        <table width="100%" style="border-collapse: separate; border-spacing: 12px;">
+        <tr>
+        {% set images = google_image_result.found_images if google_image_result.found_images else downloaded_images %}
+        {% for img in images %}
+            <td style="padding: 4px; border: 1px solid #eee; text-align: center;">
+                <img src="{{ img }}" style="width: 155px; height: 110px; object-fit: cover; border-radius: 4px;" />
+            </td>
+            {% if loop.index % 4 == 0 %}
+                </tr><tr>
+            {% endif %}
+        {% endfor %}
+        {% set last = (4 - (images|length % 4)) if images|length % 4 != 0 else 0 %}
+        {% for _ in range(last) %}<td></td>{% endfor %}
+        </tr>
+        </table>
+        {% if google_image_result.first_gallery_page %}
+            <div style="margin-top:10px;">
+                <a href="{{ google_image_result.first_gallery_page }}" style="font-size: 12px; color: #1976d2; text-decoration: underline;">
+                    View full gallery online
+                </a>
+            </div>
+        {% endif %}
+    {% endif %}
+
+
+    {% if insurance_result %}
+    <h2>Insurance Claim Check (E-Insurance)</h2>
+    {% if insurance_result.error %}
+        <p style="color: red;">{{ insurance_result.error }}</p>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Claim Found</th>
+                    <th>Excess Paid</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>{{ "Yes" if insurance_result.claim_exists else "No" }}</td>
+                    <td>{{ insurance_result.excess_paid or "N/A" }}</td>
+                </tr>
+            </tbody>
+        </table>
+    {% endif %}
+
+    {% if popup_base64 %}
+        <h2>Popup Table Screenshot</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Label</th>
+                    <th>Screenshot</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>E-insurance Screenshot</td>
+                    <td>
+                        <img src="{{ popup_base64 }}" width="600">
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    {% endif %}
+{% endif %}
+
+</body>
+</html>
+

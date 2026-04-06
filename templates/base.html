@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}Car Scraper{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+  <nav class="dash-nav">
+    <div class="nav-container">
+      <a href="/dashboard" class="nav-brand">Dhofar Insurance</a>
+      <div class="nav-user">
+        <span>Logged in as <strong>{{ session.get('username', 'admin') }}</strong></span>
+        <a href="/logout" class="nav-logout-btn">Logout</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="dash-main">
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>
+
