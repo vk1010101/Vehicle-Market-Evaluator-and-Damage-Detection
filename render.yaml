@@ -2,7 +2,7 @@ services:
   - type: web
     name: car-scraper-app
     runtime: docker
-    plan: starter # Starter plan recommended (2GB RAM) for Selenium stability
+    plan: free # Changed to free to avoid billing, though 512MB RAM might be tight for Chrome
     envVars:
       - key: PORT
         value: 5000
