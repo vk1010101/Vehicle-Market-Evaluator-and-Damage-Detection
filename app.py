@@ -679,7 +679,7 @@ def search():
                 year_min=crit.get("year_min"),
                 year_max=crit.get("year_max"),
                 page_num=page_num,
-                headless=True,  # Back to headless mode
+                headless=False,  # Temporary testing year filters
             ),
         ))
 

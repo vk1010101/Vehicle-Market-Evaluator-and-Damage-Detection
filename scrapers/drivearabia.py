@@ -1,49 +1,175 @@
 import os
+import re
 import time
+from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import StaleElementReferenceException, ElementClickInterceptedException, TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
-from urllib.parse import urljoin
+from urllib.parse import urljoin, quote
 
 # --- Strict explicit imports from scraper_utils ---
 from .scraper_utils import is_no_match_page, try_close_overlays, get_stealth_driver, human_mimic_nudge
 
-# --- Local config (can move to constants.py later) ---
+# --- Local config ---
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/138.0.0.0 Safari/537.36"
 )
 
-# --- Verified working XPaths for Make/Model (tested 2026-04) ---
-# Opens the combined Make+Model search dialog
-DRIVEARABIA_OPEN_MAKE_MODEL_TRIGGER_XPATH = (
-    "(//div[contains(text(),'Search Make, Model')])[2]"
-)
-# The actual <input> inside the dialog
-DRIVEARABIA_MAKE_MODEL_INPUT_XPATH = (
-    '//div[@role="dialog"]//input[@placeholder="Search Make, Model" and @type="text"]'
-)
-# First autocomplete result row (has <u> tag highlighting match)
-DRIVEARABIA_FIRST_MAKE_MODEL_RESULT_XPATH = (
-    '(//div[@role="dialog"]//li[contains(@class,"cursor-pointer") and .//u])[1]'
-)
+# ─────────────────────────────────────────────────────────
+#  HELPER: Build a direct DriveArabia URL from filters
+# ─────────────────────────────────────────────────────────
+def _build_drivearabia_url(make=None, model_value=None, body_type=None,
+                           year_min=None, year_max=None, page=1):
+    """
+    Build the direct URL for DriveArabia based on discovered URL pattern:
+      /carprices/oman/{make-slug}/{make-model-slug}/?bodyType=suv&minYear=2020&maxYear=2020&page=2
+    """
+    base = "https://www.drivearabia.com/carprices/oman/"
 
-def scrape_drivearabia(
-    country="Oman",
-    make=None,
-    model_value=None,
-    body_type=None,
-    price_min=None,
-    price_max=None,
-    year_min=None,
-    year_max=None,
-    page_num=1,
-    driver_path='chromedriver.exe',
-    headless=True  # Back to headless mode
-):
-    print(f"🟢 DriveArabia scraper started ({'Headless' if headless else 'Visible'} Mode)")
+    # Build path slug for make/model
+    if make:
+        make_slug = make.strip().lower().replace(" ", "-")
+        base += f"{make_slug}/"
+        if model_value:
+            model_slug = model_value.strip().lower().replace(" ", "-")
+            # DriveArabia model slug = "{make}-{model}" (e.g. toyota-land-cruiser)
+            full_model_slug = f"{make_slug}-{model_slug}"
+            base += f"{full_model_slug}/"
+
+    # Build query parameters
+    params = []
+    if body_type:
+        params.append(f"bodyType={body_type.strip().lower()}")
+    if year_min:
+        params.append(f"minYear={year_min}")
+    if year_max:
+        params.append(f"maxYear={year_max}")
+    if page and page > 1:
+        params.append(f"page={page}")
+
+    if params:
+        base += "?" + "&".join(params)
+
+    return base
+
+
+# ─────────────────────────────────────────────────────────
+#  PRIMARY: Fast URL-based scraper (no dropdown clicking)
+# ─────────────────────────────────────────────────────────
+def _scrape_drivearabia_fast(make=None, model_value=None, body_type=None,
+                              year_min=None, year_max=None, page_num=1,
+                              driver_path='chromedriver.exe', headless=True):
+    """
+    PRIMARY scraper: Constructs the URL directly with all filters baked in,
+    loads it in Selenium (needed because site blocks raw HTTP requests with 403),
+    then parses the rendered HTML with BeautifulSoup. No dropdown clicking needed!
+    """
+    print(f"🟢 DriveArabia FAST scraper started ({'Headless' if headless else 'Visible'} Mode)")
+    dp = driver_path if driver_path and os.path.isfile(str(driver_path)) else None
+    driver = get_stealth_driver(dp, headless=headless, user_agent=USER_AGENT)
+
+    cars = []
+    try:
+        for page_idx in range(page_num):
+            url = _build_drivearabia_url(
+                make=make, model_value=model_value, body_type=body_type,
+                year_min=year_min, year_max=year_max, page=page_idx + 1
+            )
+            print(f"🌍 Loading DriveArabia URL: {url}")
+            driver.get(url)
+            time.sleep(3)  # Let JS render the car cards
+
+            # Grab rendered HTML and parse with BeautifulSoup
+            soup = BeautifulSoup(driver.page_source, "html.parser")
+
+            # Find all car cards (div with class rounded-10)
+            card_elements = soup.find_all("div", class_="rounded-10")
+            print(f"📊 Found {len(card_elements)} car cards on page {page_idx + 1}")
+
+            if not card_elements:
+                # If no cards found on first page, this URL pattern may not work
+                if page_idx == 0:
+                    print("⚠️ No car cards found - URL pattern may be wrong")
+                    return None  # Signal to fall back to legacy scraper
+                else:
+                    print("📄 No more pages available")
+                    break
+
+            for card in card_elements:
+                # Car Name from h2
+                h2 = card.find("h2")
+                car_name = h2.get_text(strip=True).replace('\n', ' ') if h2 else ""
+
+                # Price from span.text-black-1
+                price_span = card.find("span", class_="text-black-1")
+                price = price_span.get_text(strip=True) if price_span else ""
+
+                # Body Type
+                bt_span = card.find("span", string=re.compile(r"Body Type", re.I))
+                bt_val = ""
+                if bt_span:
+                    bt_p = bt_span.find_next_sibling("p")
+                    if bt_p:
+                        bt_val = bt_p.get_text(strip=True)
+
+                # Fuel Efficiency
+                fuel_span = card.find("span", string=re.compile(r"Fuel Efficiency", re.I))
+                fuel_val = ""
+                if fuel_span:
+                    fuel_p = fuel_span.find_next_sibling("p")
+                    if fuel_p:
+                        fuel_val = fuel_p.get_text(strip=True)
+
+                # Link
+                link = "N/A"
+                if h2:
+                    parent_a = h2.find_parent("a")
+                    if parent_a and parent_a.get("href"):
+                        link = urljoin("https://www.drivearabia.com", parent_a["href"])
+
+                if car_name or price:
+                    cars.append({
+                        "Car Name": car_name,
+                        "Price": price,
+                        "Body Type": bt_val,
+                        "Fuel Efficiency": fuel_val,
+                        "Source": "DriveArabia",
+                        "link": link
+                    })
+
+    except Exception as e:
+        print(f"❌ DriveArabia FAST scraper error: {e}")
+        if not cars:
+            return None  # Signal fallback
+    finally:
+        try:
+            driver.quit()
+        except Exception:
+            pass
+        try:
+            del driver
+        except Exception:
+            pass
+
+    print(f"✅ DriveArabia FAST scraped {len(cars)} cars")
+    return cars
+
+
+# ─────────────────────────────────────────────────────────
+#  FALLBACK: Legacy Selenium click-based scraper
+# ─────────────────────────────────────────────────────────
+def _scrape_drivearabia_legacy(country="Oman", make=None, model_value=None,
+                                body_type=None, price_min=None, price_max=None,
+                                year_min=None, year_max=None, page_num=1,
+                                driver_path='chromedriver.exe', headless=True):
+    """
+    FALLBACK scraper: The original Selenium-based approach that clicks through
+    dropdowns. Used only when the fast URL-based approach fails.
+    """
+    print(f"🟡 DriveArabia LEGACY scraper started ({'Headless' if headless else 'Visible'} Mode)")
     dp = driver_path if driver_path and os.path.isfile(str(driver_path)) else None
     driver = get_stealth_driver(dp, headless=headless, user_agent=USER_AGENT)
     driver.get('https://www.drivearabia.com/carprices/oman/')
@@ -61,7 +187,7 @@ def scrape_drivearabia(
         return " ".join(parts).strip()
 
     def _click_first_visible_suggestion():
-        """Click first autocomplete result (li with u tag highlight) — no dialog wrapper needed."""
+        """Click first autocomplete result (li with u tag highlight)."""
         SUGGESTION_XP = "(//li[contains(@class,'cursor-pointer') and .//u])[1]"
         deadline = time.time() + 10
         while time.time() < deadline:
@@ -103,7 +229,6 @@ def scrape_drivearabia(
     if query:
         try:
             print(f"🔎 Setting make/model: {query}")
-            # The input is directly accessible — no trigger/dialog needed
             make_model_box = WebDriverWait(driver, 12).until(
                 EC.element_to_be_clickable((By.XPATH, "//input[@placeholder='Search Make, Model']"))
             )
@@ -115,10 +240,9 @@ def scrape_drivearabia(
             make_model_box.send_keys(query)
             time.sleep(0.6)
 
-            # Click first autocomplete suggestion (li with <u> highlight, no dialog wrapper)
             if _click_first_visible_suggestion():
                 print(f"✅ Make/Model '{query}' selected")
-                time.sleep(1.0)  # wait for page to re-render results
+                time.sleep(1.0)
             else:
                 print(f"⚠️ No visible suggestion for: {query!r}")
         except Exception as e:
@@ -127,7 +251,6 @@ def scrape_drivearabia(
     if body_type:
         try:
             print(f"🔎 Setting body type: {body_type}")
-            # Click the Body Type dropdown button to open it
             body_type_btn = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, "//button[.//div[text()='Body Type'] or normalize-space()='Body Type']"))
             )
@@ -136,7 +259,6 @@ def scrape_drivearabia(
             driver.execute_script("arguments[0].click();", body_type_btn)
             time.sleep(0.8)
 
-            # Click the specific body type button by text (SUV, Sedan, etc.)
             body_opt = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH,
                     f"//button[normalize-space()='{body_type}' or normalize-space()='{body_type.upper()}' or normalize-space()='{body_type.capitalize()}']"))
@@ -145,7 +267,6 @@ def scrape_drivearabia(
             print(f"✅ Body type '{body_type}' selected")
             time.sleep(0.5)
 
-            # Apply button
             try:
                 apply_btn = WebDriverWait(driver, 5).until(
                     EC.element_to_be_clickable((By.XPATH,
@@ -159,45 +280,7 @@ def scrape_drivearabia(
         except Exception as e:
             print(f"❌ Body type filter error: {e}")
 
-    # Model is now handled in the combined Make/Model section above
-    # No separate model handling needed
-
-    # try:
-    #     if price_min:
-    #         price_min_btn = driver.find_element(
-    #             By.XPATH, '(//button[contains(@class,"bg-brand-2") and .//span[contains(text(),"flex")]])[1]'
-    #         )
-    #         price_min_btn.click()
-    #         time.sleep(1)
-    #         price_option = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((
-    #             By.CSS_SELECTOR, f"div[data-option='{price_min}']"
-    #         )))
-    #         price_option.click()
-    #         time.sleep(1)
-    #     if price_max:
-    #         price_max_btn = driver.find_element(
-    #             By.XPATH, '(//button[contains(@class,"bg-brand-2") and .//span[contains(text(),"flex")]])[2]'
-    #         )
-    #         price_max_btn.click()
-    #         time.sleep(1)
-    #         price_max_options = driver.find_elements(
-    #             By.XPATH, "//div[@id='main-content']/div[3]/div/div/div/div[2]/div[3]/div/div[2]/div/div/div"
-    #         )
-    #         for option in price_max_options:
-    #             option_text = option.text.strip().replace(",", "")
-    #             if str(price_max) == option_text:
-    #                 option.click()
-    #                 break
-    #         time.sleep(1)
-    #     price_apply = driver.find_element(
-    #         By.XPATH, "//div[@id='main-content']/div[3]/div/div/div/div[2]/div[3]/div[2]/button"
-    #     )
-    #     price_apply.click()
-    #     time.sleep(2)
-    # except Exception as e:
-    #     print("Price filter error:", e)
-
-    # Year filter — lives inside "More Filters" panel
+    # Year filter
     try:
         if year_min or year_max:
             print("🔎 Opening More Filters for Year...")
@@ -242,7 +325,6 @@ def scrape_drivearabia(
                 driver.execute_script("arguments[0].click();", year_option)
                 print(f"✅ Max year selected: {year_max}")
 
-            # Apply year filter
             try:
                 apply_btn = WebDriverWait(driver, 3).until(
                     EC.element_to_be_clickable((By.XPATH,
@@ -258,22 +340,21 @@ def scrape_drivearabia(
 
     cars = []
     for page_idx in range(page_num):
-        time.sleep(1.2)  # Reduced to speed up
-        
-        # Check if driver session is still valid
+        time.sleep(1.2)
+
         try:
-            driver.current_url  # This will throw an exception if session is invalid
+            driver.current_url
         except Exception as e:
             print(f"❌ Browser session lost: {e}")
             break
-            
+
         try:
             card_links = driver.find_elements(By.CLASS_NAME, "rounded-10")
             print(f"📊 Found {len(card_links)} car cards on page {page_idx + 1}")
         except Exception as e:
             print(f"❌ Error finding car cards: {e}")
             break
-            
+
         for card in card_links:
             try:
                 car_name = card.find_element(By.TAG_NAME, "h2").text.replace('\n', ' ').strip()
@@ -312,17 +393,15 @@ def scrape_drivearabia(
                     "Source": "DriveArabia",
                     "link": link
                 })
-        # Handle pagination if there are more pages
-        if page_idx < page_num - 1:  # Not the last page
+        # Pagination
+        if page_idx < page_num - 1:
             try:
-                # Check if session is still valid before pagination
                 driver.current_url
-                
                 next_btn = driver.find_element(By.XPATH, '//a[@rel="next"]')
                 if next_btn and next_btn.is_enabled():
                     print(f"🔄 Going to page {page_idx + 2}")
                     next_btn.click()
-                    time.sleep(2)  # Wait for page to load
+                    time.sleep(2)
                 else:
                     print("📄 No more pages available")
                     break
@@ -338,5 +417,55 @@ def scrape_drivearabia(
         del driver
     except Exception:
         pass
-    print(f"✅ DriveArabia scraped {len(cars)} cars ({'Headless' if headless else 'Visible'} Mode)")
+    print(f"✅ DriveArabia LEGACY scraped {len(cars)} cars")
     return cars
+
+
+# ─────────────────────────────────────────────────────────
+#  PUBLIC ENTRY POINT: Try fast first, fall back to legacy
+# ─────────────────────────────────────────────────────────
+def scrape_drivearabia(
+    country="Oman",
+    make=None,
+    model_value=None,
+    body_type=None,
+    price_min=None,
+    price_max=None,
+    year_min=None,
+    year_max=None,
+    page_num=1,
+    driver_path='chromedriver.exe',
+    headless=True
+):
+    """
+    Main entry point. Tries the FAST URL-based approach first.
+    If it returns None (meaning URL pattern failed), falls back to LEGACY click-based scraper.
+    """
+    # ── Attempt 1: Fast URL-based scraper ──
+    print("🚀 Attempting DriveArabia FAST (URL-based) scraper...")
+    try:
+        result = _scrape_drivearabia_fast(
+            make=make, model_value=model_value, body_type=body_type,
+            year_min=year_min, year_max=year_max, page_num=page_num,
+            driver_path=driver_path, headless=headless
+        )
+        if result is not None:
+            print(f"✅ DriveArabia FAST scraper succeeded with {len(result)} results")
+            return result
+        else:
+            print("⚠️ DriveArabia FAST scraper returned None — falling back to LEGACY")
+    except Exception as e:
+        print(f"❌ DriveArabia FAST scraper crashed: {e} — falling back to LEGACY")
+
+    # ── Attempt 2: Legacy click-based scraper ──
+    print("🔄 Starting DriveArabia LEGACY (click-based) scraper...")
+    try:
+        return _scrape_drivearabia_legacy(
+            country=country, make=make, model_value=model_value,
+            body_type=body_type, price_min=price_min, price_max=price_max,
+            year_min=year_min, year_max=year_max, page_num=page_num,
+            driver_path=driver_path, headless=headless
+        )
+    except Exception as e:
+        print(f"❌ DriveArabia LEGACY scraper also failed: {e}")
+        return []
